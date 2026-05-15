@@ -2,12 +2,12 @@
 
 ## Part 1 Communication
 
-1. Connection manager gui
-2. connection manager gui serial
-3. interfacing logic and mcu program
-4. communication manager gui
-5. communication manager gui serial
+- [x] Connection manager gui 
+- [ ] connection manager gui serial 
+- [ ] interfacing logic and mcu program 
+- [ ] communication manager gui 
+- [ ] communication manager gui serial
 
 ## Part 2 Data display
-6. Data dislpay gui
-7. 
+- [ ] Data dislpay gui
+- [ ]   
