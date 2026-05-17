@@ -3,7 +3,7 @@
 ## Part 1 Communication
 
 - [x] Connection manager gui 
-- [ ] connection manager gui serial 
+- [x] connection manager gui serial 
 - [ ] interfacing logic and mcu program 
 - [ ] communication manager gui 
 - [ ] communication manager gui serial
