@@ -1,3 +1,4 @@
+"""Creating this to test the BMS code"""
 # bms_simulator.py
 import serial
 import time

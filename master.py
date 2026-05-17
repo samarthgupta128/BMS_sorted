@@ -10,3 +10,5 @@ ComMaster = ComGui(RootMaster.root, MySerial)
 
 # Start the Graphic User Interface
 RootMaster.root.mainloop()
+
+"""Note: Use Socat to create a virtual serial port pair for testing the simulator and master together."""
