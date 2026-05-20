@@ -1,32 +1,62 @@
-"""Creating this to test the BMS code"""
-# bms_simulator.py
 import serial
 import time
 import random
+import json
 
-# Replace with the FIRST port socat gave you
-SIMULATOR_PORT = '/dev/pts/1'
+SIMULATOR_PORT = '/dev/pts/2'
 BAUD_RATE = 9600
 
-try:
-    ser = serial.Serial(SIMULATOR_PORT, BAUD_RATE)
-    print(f"Simulator connected to {SIMULATOR_PORT}")
+NUM_SEGMENTS = 14
+CELLS_PER_SEGMENT = 9
+TOTAL_CELLS = NUM_SEGMENTS * CELLS_PER_SEGMENT
 
-    while True:
-        # Generate realistic fluctuating BMS data
-        voltage = round(random.uniform(11.5, 12.6), 2)  # Volts
-        current = round(random.uniform(0.5, 5.0), 2)  # Amps
-        temp = round(random.uniform(25.0, 35.0), 1)  # Celsius
-        soc = round(random.uniform(80.0, 100.0), 1)  # State of Charge %
+def generate_frame():
+    base_voltage = random.uniform(3.6, 3.9)
+    voltages = [round(max(0.0, random.gauss(base_voltage, 0.03)), 3) for _ in range(TOTAL_CELLS)]
+    temperatures = [round(random.uniform(25.0, 35.0), 1) for _ in range(TOTAL_CELLS)]
+    balancing = [random.random() < 0.1 for _ in range(TOTAL_CELLS)]
+    
+    pack_voltage = sum(voltages)
+    current = round(random.uniform(5.0, 15.0), 2)
+    
+    data = {
+        "pack_voltage": round(pack_voltage, 2),
+        "total_current": current,
+        "peak_current": round(current * 1.5, 2),
+        "temperature": round(sum(temperatures)/len(temperatures), 1),
+        "soc": round(random.uniform(80.0, 100.0), 1),
+        "soh": 98.5,
+        "cycle_count": 142,
+        "capacity": 55.0,
+        "cell_voltages": voltages,
+        "cell_temperatures": temperatures,
+        "balancing": balancing,
+        "alarms": {
+            "over_voltage": any(v > 4.2 for v in voltages),
+            "under_voltage": any(v < 3.0 for v in voltages),
+            "over_temp": any(t > 60 for t in temperatures),
+            "under_temp": any(t < 0 for t in temperatures),
+            "over_current": current > 100,
+            "open_wire": False,
+            "open_wire_temp": False
+        }
+    }
+    return data
 
-        # Format the data (assuming a simple comma-separated string)
-        data_string = f"{voltage},{current},{temp},{soc}\n"
+def main():
+    try:
+        ser = serial.Serial(SIMULATOR_PORT, BAUD_RATE, timeout=1)
+        print(f"Simulator connected to {SIMULATOR_PORT} @ {BAUD_RATE}bps")
 
-        # Send via UART
-        ser.write(data_string.encode('utf-8'))
-        print(f"Sent: {data_string.strip()}")
+        while True:
+            frame = generate_frame()
+            line = json.dumps(frame) + "\n"
+            ser.write(line.encode('utf-8'))
+            print("Sent JSON frame")
+            time.sleep(1)
 
-        time.sleep(1)  # Send data every second
+    except serial.SerialException as e:
+        print(f"Serial error: {e}")
 
-except serial.SerialException as e:
-    print(f"Error: {e}")
+if __name__ == '__main__':
+    main()
