@@ -1,14 +1,21 @@
-
-from gui_master import RootGUI, ComGui
+"""
+Main entry point for the RMS BMS UI application.
+This script initializes the GUI root and the Application Controller, 
+linking the graphical interface with the Serial Controller.
+"""
+from gui_master import RootGUI, AppController
 from Serial_Com_ctrl import SerialCtrl
 
-# Initiate the Root class that will manage the other classes
-MySerial = SerialCtrl()
-RootMaster = RootGUI()
-# Initiate the Communication Master class that will manage all the other GUI classes
-ComMaster = ComGui(RootMaster.root, MySerial)
+# Initialize the main Tkinter root window
+root = RootGUI()
 
-# Start the Graphic User Interface
-RootMaster.root.mainloop()
+# Create the application controller, passing the root window 
+# and a new instance of the Serial communication controller
+AppController(root.root, SerialCtrl())
 
+# Start the Tkinter main event loop to display the GUI
+root.root.mainloop()
+
+
+# if you wanna use a Virtual serial port to test using dummy data
 """Note: Use Socat to create a virtual serial port pair for testing the simulator and master together."""
