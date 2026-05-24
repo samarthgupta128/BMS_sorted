@@ -7,9 +7,9 @@
 //  Frame layout (matches Serial_Com_ctrl.py EXTENDED_FRAME):
 //    [0x AA, 0x55]          – 2 bytes header
 //    flags[9][14]           – 126 bytes  (1 byte per cell)
-//    voltages[9][14]        – 252 bytes  (uint16 big-endian, RAW ADC values)
-//    temps[9][14]           – 252 bytes  (int16  big-endian, RAW ADC values)
-//    current                –   2 bytes  (int16  big-endian, A × 10)
+//    voltages[9][14]        – 252 bytes  (int16 big-endian, RAW ADC values)
+//    temps[9][14]           – 252 bytes  (int16 big-endian, RAW ADC values)
+//    current                –   2 bytes  (int16 big-endian, A × 10)
 //
 //  Bit layout of each flag byte  (bit 7 → bit 0):
 //    [OV | UV | OT | UT | OW | OWT | B | 0]
@@ -162,7 +162,7 @@ void loop() {
         }
     }
 
-    // Voltages: 252 bytes (uint16 big-endian, raw ADC values)
+    // Voltages: 252 bytes (int16 big-endian, raw ADC values)
     for (int s = 0; s < NUM_SEG; s++) {
         for (int c = 0; c < NUM_CELLS; c++) {
             int16_t send_v = voltages[s][c];
@@ -173,7 +173,7 @@ void loop() {
                 if (phase == 2) send_v = 8000;  // UV -> forces 2.7V
             }
             
-            writeU16BE((uint16_t)send_v);
+            writeI16BE(send_v);
         }
     }
 
