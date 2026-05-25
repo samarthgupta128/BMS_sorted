@@ -34,9 +34,9 @@ The app connects to a BMS over Serial and displays live:
 |-----------|----------|---------------------|--------------------------------------|
 | Header    | 2 bytes  | `0xAA 0x55`         | Frame sync marker                    |
 | Flags     | 126 bytes | 1 byte/cell        | Cell Fault Flags (Given Bellow)     |
-| Voltages  | 252 bytes | Big-endian int16   | Raw ADC — converted via     |
+| Voltages  | 252 bytes | Big-endian int16   | Raw ADC                    |
 | Temps     | 252 bytes | Big-endian int16   | Raw ADC — converted via NTC LUT interpolation |
-| Current   | 2 bytes  | Big-endian int16   | Amps × 10 (signed)                  |
+| Current   | 2 bytes  | Big-endian int16   | Amps × 10                   |
 
 ## Cell Fault Flags (per byte, MSB first)
 
