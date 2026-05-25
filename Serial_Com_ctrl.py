@@ -1,6 +1,6 @@
 import serial.tools.list_ports, struct, glob
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────
 # BMS UART Frame layout (little-endian throughout):
 #
 #   FRAME_HEADER  : 2 bytes  = 0xAA 0x55
@@ -15,7 +15,7 @@ import serial.tools.list_ports, struct, glob
 # If your firmware does NOT send the full extended frame yet, set
 # EXTENDED_FRAME = False and the parser falls back to the old 126-byte
 # flag-only mode (voltages/temps stay at their default values).
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────
 
 EXTENDED_FRAME = True
 NUM_SEGMENTS, NUM_CELLS = 9, 14
@@ -149,10 +149,15 @@ class SerialCtrl:
         return sum(self.voltage_v(s, c)
                    for s in range(NUM_SEGMENTS) for c in range(NUM_CELLS))
 
+    def segment_voltage_v(self, s):
+        """Calculates total voltage of a specific segment."""
+        return sum(self.voltage_v(s, c) for c in range(NUM_CELLS))
+
     def _sorted_cells(self, key_fn, n=3):
-        """Helper to sort all cells by a given function and return top 'n'."""
+        """Helper to sort all cells by a given function and return top 'n'. Excludes cells with Open Wire (V) faults."""
         return sorted([(s, c, self.voltage_v(s, c))
-                       for s in range(NUM_SEGMENTS) for c in range(NUM_CELLS)],
+                       for s in range(NUM_SEGMENTS) for c in range(NUM_CELLS)
+                       if not self.bms_data[s][c]["OW"]],
                       key=key_fn)[:n]
 
     def top3_voltages(self):    
@@ -164,9 +169,10 @@ class SerialCtrl:
         return self._sorted_cells(lambda x:  x[2])
 
     def top3_temps(self):
-        """Returns the top 3 highest cell temperatures."""
+        """Returns the top 3 highest cell temperatures. Excludes cells with Open Wire (T) faults."""
         return sorted([(s, c, self.temp_c(s, c))
-                       for s in range(NUM_SEGMENTS) for c in range(NUM_CELLS)],
+                       for s in range(NUM_SEGMENTS) for c in range(NUM_CELLS)
+                       if not self.bms_data[s][c]["OWT"]],
                       key=lambda x: -x[2])[:3]
 
     # ── Port helpers ─────────────────────────────────────────────────────────
