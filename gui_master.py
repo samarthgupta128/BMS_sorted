@@ -45,7 +45,7 @@ class RootGUI:
     def __init__(self):
         self.root = Tk()
         self.root.title("IIT Roorkee Motorsports | BMS")
-        self.root.geometry("1440x860"); self.root.minsize(1100, 680)
+        self.root.geometry("1440x860"); self.root.minsize(1200, 880)
         self.root.config(bg=BG); self.root.resizable(True, True)
 
 
@@ -172,6 +172,7 @@ class BMSGui:
     def __init__(self, root, serial, on_home_cb=None):
         self.root, self.serial, self.on_home_cb = root, serial, on_home_cb
         self._tooltip, self._cells, self._alive = None, {}, True
+        self._seg_headers = {}
         
         # Build layout components
         self._build_header()
@@ -210,8 +211,8 @@ class BMSGui:
         bar = Frame(self.root, bg=BG_PANEL)
         bar.pack(fill=X, side=BOTTOM)
         
-        self._status_bar = Label(bar, text="● Live  |  Polling every 250 ms",
-            font=("Segoe UI",8), fg=ACCENT, bg=BG_PANEL, anchor="w", padx=12, pady=4)
+        self._status_bar = Label(bar, text="● Live  |  Polling every 1sec",
+            font=("Segoe UI",11), fg=ACCENT, bg=BG_PANEL, anchor="w", padx=12, pady=4)
         self._status_bar.pack(side=LEFT)
         
         Label(bar, text="Made By Agastya and Samarth",
@@ -324,8 +325,10 @@ class BMSGui:
 
         # Segment Header (e.g. 'S1', 'S2')
         hdr = Frame(card, bg=BG_CARD, height=22); hdr.pack(fill=X, side=TOP); hdr.pack_propagate(False)
-        Label(hdr, text=f"S{seg+1}", font=("Segoe UI",9,"bold"), fg=ACCENT2,
-              bg=BG_CARD, anchor="center").place(relx=0.5, rely=0.5, anchor="center")
+        lbl = Label(hdr, text=f"S{seg+1} Voltage = 0.000 V", font=("Segoe UI",9,"bold"), fg=ACCENT2,
+              bg=BG_CARD, anchor="center")
+        lbl.place(relx=0.5, rely=0.5, anchor="center")
+        self._seg_headers[seg] = lbl
 
         # Segment Cells Grid (Creates a flexible grid layout)
         bf = Frame(card, bg=BG_SEG); bf.pack(fill=BOTH, expand=True, padx=4, pady=4)
@@ -370,6 +373,10 @@ class BMSGui:
         """Updates the numeric labels in the left panel stats."""
         sc = self.serial
         
+        # Segment headers
+        for seg, lbl in self._seg_headers.items():
+            lbl.config(text=f"S{seg+1} Voltage = {sc.segment_voltage_v(seg):.3f} V")
+        
         # Overall pack info
         self._lbl_total_v.config(text=f"{sc.total_voltage_v():.2f}")
         cur = sc.current_a()
@@ -385,7 +392,7 @@ class BMSGui:
             
         # Hottest temperatures
         for i, (s, c, t) in enumerate(sc.top3_temps()):
-            self._hi_t[i][0].config(text=f"S{s+1}C{c+1}"); self._hi_t[i][1].config(text=f"{t:.1f} °C")
+            self._hi_t[i][0].config(text=f"S{s+1}C{c+1}"); self._hi_t[i][1].config(text=f"{t:.2f} °C")
 
     def _refresh_all(self):
         """Performs a full UI refresh based on latest serial data."""
@@ -431,7 +438,7 @@ class BMSGui:
         mr = Frame(inner, bg=BG_CARD); mr.pack(fill=X, pady=(0,6))
         Label(mr, text=f"⚡  {v:.3f} V", font=("Segoe UI",10,"bold"),
               fg=RED if (v>=OV_V or v<=UV_V) else ACCENT, bg=BG_CARD).pack(side=LEFT, padx=(0,18))
-        Label(mr, text=f"🌡  {t:.1f} °C", font=("Segoe UI",10,"bold"),
+        Label(mr, text=f"🌡  {t:.2f} °C", font=("Segoe UI",10,"bold"),
               fg=ORANGE if (t>=OT_C or t<=UT_C) else FG, bg=BG_CARD).pack(side=LEFT)
         Frame(inner, bg=BG_PANEL, height=1).pack(fill=X, pady=(0,6))
 
@@ -463,7 +470,7 @@ class BMSGui:
 
     # ── Poll ──────────────────────────────────────────────────────────────────
     def _poll(self):
-        """Background poll loop runs every 250ms to read UART data and update UI."""
+        """Background poll loop runs every 1s to read UART data and update UI."""
         if not self._alive: return
         try:
             # Tell the serial controller to read from the port and parse any complete frames.
@@ -474,14 +481,14 @@ class BMSGui:
             # Update the tiny status bar at the bottom depending on connection state
             live = getattr(self.serial, 'status', False)
             self._status_bar.config(
-                text="● Live  |  Polling every 250 ms" if live else "○ Disconnected",
+                text="● Live  |  Polling every 1sec" if live else "○ Disconnected",
                 fg=ACCENT if live else RED)
         except TclError:
             # Tkinter might throw TclError if the window was closed during the middle of a poll
             self._alive = False; return
             
-        # Schedule this exact function to run again in 250 milliseconds
-        self.root.after(250, self._poll)
+        # Schedule this exact function to run again in 1000 milliseconds (1 second)
+        self.root.after(1000, self._poll)
 
     def _disconnect(self):
         """Disconnects serial port and switches UI back to ComGui."""
