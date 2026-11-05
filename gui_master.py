@@ -14,7 +14,7 @@ CELL_COLORS = {"green": GREEN, "red": RED, "orange": ORANGE, "yellow": YELLOW}
 # Hardcoded thresholds to visually indicate cell faults in the UI
 OV_V, UV_V, OT_C, UT_C = 4.2, 2.8, 60.0, 0.0
 ROWS_PER_SEG, COLS_PER_SEG = 7, 2   # Layout: 7 rows by 2 columns = 14 cells
-
+CELL_FONT, CELL_FONT_BOLD = ("Segoe UI", 6), ("Segoe UI", 6, "bold")  # per-cell Temp/C/Voltage font
 
 def effective_color(serial, s, c):
     """
@@ -168,6 +168,7 @@ class ComGui:
 class BMSGui:
     """UI displaying live BMS status, pack statistics, and individual cell details."""
     CARD_W, CARD_H, GAP = 210, 260, 10
+    LEFT_W = 620   # fixed width for the left stats panel
 
     def __init__(self, root, serial, on_home_cb=None):
         self.root, self.serial, self.on_home_cb = root, serial, on_home_cb
@@ -211,7 +212,7 @@ class BMSGui:
         bar = Frame(self.root, bg=BG_PANEL)
         bar.pack(fill=X, side=BOTTOM)
         
-        self._status_bar = Label(bar, text="● Live  |  Polling every 1sec",
+        self._status_bar = Label(bar, text="● Live  |  Polling every 500ms",
             font=("Segoe UI",11), fg=ACCENT, bg=BG_PANEL, anchor="w", padx=12, pady=4)
         self._status_bar.pack(side=LEFT)
         
@@ -222,17 +223,17 @@ class BMSGui:
     def _build_body(self):
         """Main dashboard body layout, splitting into Left Panel (stats) and Right Grid (segments)."""
         body = Frame(self.root, bg=BG); body.pack(fill=BOTH, expand=True)
-        CW, CH, GAP = self.CARD_W, self.CARD_H, self.GAP
-        RIGHT_W = 3*CW + 4*GAP # Right section width
 
-        # Right container for segment grids
-        right = Frame(body, bg=BG, width=RIGHT_W)
-        right.pack(side=RIGHT, fill=Y); right.pack_propagate(False)
+        # Right container for segment grids - now flexes to fill whatever space
+        # is left, instead of a hard pixel width, so fullscreen actually helps.
+        right = Frame(body, bg=BG)
+        right.pack(side=RIGHT, fill=BOTH, expand=True)
         Frame(body, bg=BG_CARD, width=2).pack(side=RIGHT, fill=Y) # divider
 
-        # Left container (scrollable) for statistics
-        left_outer = Frame(body, bg=BG_PANEL)
-        left_outer.pack(side=LEFT, fill=BOTH, expand=True)
+        # Left container (scrollable) for statistics - fixed width now; its
+        # content doesn't need extra room, and it used to eat all the slack.
+        left_outer = Frame(body, bg=BG_PANEL, width=self.LEFT_W)
+        left_outer.pack(side=LEFT, fill=Y); left_outer.pack_propagate(False)
 
         # Setup scrolling for left panel
         sb = Scrollbar(left_outer, orient=VERTICAL, bg=BG_PANEL, troughcolor=BG_DARK)
@@ -340,34 +341,60 @@ class BMSGui:
         for ri in range(ROWS_PER_SEG):
             for ci in range(COLS_PER_SEG):
                 cell = ri + ci*ROWS_PER_SEG
-                
-                # Each cell is represented as a button
-                btn = Button(bf, text=f"C{cell+1}", font=("Segoe UI",8,"bold"),
-                             relief=FLAT, cursor="hand2", bg=GREEN, fg="#0a2010",
-                             activebackground=GREEN, activeforeground="#0a2010", bd=0)
-                btn.grid(row=ri, column=ci, padx=2, pady=2, sticky="nsew")
-                
-                # Bind hover events for tooltips
-                btn.bind("<Enter>", lambda e, s=seg, c=cell: self._show_tip(e, s, c))
-                btn.bind("<Leave>", self._hide_tip)
-                self._cells[(seg, cell)] = btn
+
+                # Each cell is a small frame: Temp (left) | Cn (center) | Voltage (right)
+                cf = Frame(bf, bg=GREEN, relief=FLAT, bd=0, cursor="hand2")
+                cf.grid(row=ri, column=ci, padx=2, pady=2, sticky="nsew")
+
+                lbl_t = Label(cf, text="—", font=CELL_FONT, bg=GREEN, fg="#0a2010")
+                lbl_t.pack(side=LEFT, padx=(3, 0))
+
+                lbl_v = Label(cf, text="—", font=CELL_FONT, bg=GREEN, fg="#0a2010")
+                lbl_v.pack(side=RIGHT, padx=(0, 3))
+
+                lbl_c = Label(cf, text=f"C{cell+1}", font=CELL_FONT_BOLD, bg=GREEN, fg="#0a2010")
+                lbl_c.pack(side=LEFT, expand=True)
+
+                # Bind hover on the frame AND every label inside it - each is a
+                # separate window, so only the widget under the cursor fires <Enter>/<Leave>
+                for w in (cf, lbl_t, lbl_c, lbl_v):
+                    w.bind("<Enter>", lambda e, s=seg, c=cell: self._show_tip(e, s, c))
+                    w.bind("<Leave>", self._hide_tip)
+
+                self._cells[(seg, cell)] = (cf, lbl_t, lbl_c, lbl_v)
 
         GAP = self.GAP
         def _resize(event, _card=card, _seg=seg):
-            """Resizes cards to fill available space dynamically."""
+            """Resizes cards - and rescales cell text with them - to fill available space."""
             ncw = max(120, (event.width  - 4*GAP) // 3)
             nch = max(160, (event.height - 4*GAP) // 3)
             _r, _c = _seg//3, _seg%3
             _card.place(x=GAP+_c*(ncw+GAP), y=GAP+_r*(nch+GAP), width=ncw, height=nch)
+
+            # 6pt at a 210px card is the verified-safe floor (tested at that
+            # size with no clipping across all 126 cells); scale up from it.
+            fsize = min(11, max(CELL_FONT[1], round(ncw * CELL_FONT[1] / self.CARD_W)))
+            for _cell in range(NUM_CELLS):
+                _cf, _lt, _lc, _lv = self._cells[(_seg, _cell)]
+                _lt.config(font=(CELL_FONT[0], fsize))
+                _lv.config(font=(CELL_FONT[0], fsize))
+                _lc.config(font=(CELL_FONT[0], fsize, "bold"))
         parent.bind("<Configure>", _resize, add="+")
 
     # ── Refresh ───────────────────────────────────────────────────────────────
     def _refresh_grid(self):
-        """Updates the background color of each cell in the UI."""
-        for (s, c), btn in self._cells.items():
-            col = effective_color(self.serial, s, c)
-            btn.config(bg=CELL_COLORS[col], activebackground=CELL_COLORS[col],
-                       fg="#ffffff" if col == "red" else "#0a2010")
+        """Updates each cell's Temp / C-label / Voltage text and its status color."""
+        sc = self.serial
+        for (s, c), (cf, lbl_t, lbl_c, lbl_v) in self._cells.items():
+            col = effective_color(sc, s, c)
+            bg = CELL_COLORS[col]
+            fg = "#ffffff" if col == "red" else "#0a2010"
+            t, v = sc.temp_c(s, c), sc.voltage_v(s, c)
+
+            cf.config(bg=bg)
+            lbl_t.config(text=f"{t:.1f}°C", bg=bg, fg=fg)
+            lbl_c.config(text=f"C{c+1}", bg=bg, fg=fg)
+            lbl_v.config(text=f"{v:.2f}V", bg=bg, fg=fg)
 
     def _refresh_stats(self):
         """Updates the numeric labels in the left panel stats."""
@@ -481,7 +508,7 @@ class BMSGui:
             # Update the tiny status bar at the bottom depending on connection state
             live = getattr(self.serial, 'status', False)
             self._status_bar.config(
-                text="● Live  |  Polling every 1sec" if live else "○ Disconnected",
+                text="● Live  |  Polling every 500ms" if live else "○ Disconnected",
                 fg=ACCENT if live else RED)
         except TclError:
             # Tkinter might throw TclError if the window was closed during the middle of a poll
