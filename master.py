@@ -15,7 +15,3 @@ AppController(root.root, SerialCtrl())
 
 # Start the Tkinter main event loop to display the GUI
 root.root.mainloop()
-
-
-# if you wanna use a Virtual serial port to test using dummy data
-"""Note: Use Socat to create a virtual serial port pair for testing the simulator and master together."""
