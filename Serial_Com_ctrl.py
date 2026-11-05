@@ -1,20 +1,15 @@
 import serial.tools.list_ports, struct, glob
 
 # ─────────────────────────────────────────────────────────────────────────
-# BMS UART Frame layout (little-endian throughout):
-#
+# BMS UART Frame layout
+
 #   FRAME_HEADER  : 2 bytes  = 0xAA 0x55
 #   flags[]       : 126 bytes (9 seg × 14 cells, 1 byte each)
-#                   each byte = [OV UV OT UT OW OWT B 0]  (bit 7 → 0)
+#                   each byte = [OV UV OT UT OW OWT B 0]
 #   voltages[]    : 252 bytes (9×14 int16, mV per cell, big-endian)
 #   temps[]       : 252 bytes (9×14 int16, 0.1 °C per cell, big-endian)
 #   current       : 2 bytes   int16, Amps × 10  (signed)
-#   ─────────────────────────────────────────────────────────────────
-#   Total         : 2 + 126 + 252 + 252 + 2 = 634 bytes
-#
-# If your firmware does NOT send the full extended frame yet, set
-# EXTENDED_FRAME = False and the parser falls back to the old 126-byte
-# flag-only mode (voltages/temps stay at their default values).
+
 # ─────────────────────────────────────────────────────────────────────────
 
 EXTENDED_FRAME = True
@@ -50,14 +45,12 @@ VOLT_TABLE = [
 
 def calculate_cell_voltage(raw_input: int) -> float:
     """
-    Converts raw int16_t from the BMS analog-to-digital converter to the final cell voltage.
-    The hardware scales the reading such that Voltage = (Raw * 0.00015) + 1.5.
+    reading of the Voltage = (Raw * 0.00015) + 1.5.
     """
     return (raw_input * 0.00015) + 1.5
 
 def voltage_to_temperature(raw_input: int) -> float:
     """
-    Converts raw int16_t to temperature using linear interpolation against a lookup table.
     The BMS reads temperature as an analog voltage from an NTC thermistor.
     """
     # First, calculate the voltage equivalent from the raw ADC value
